@@ -1,0 +1,21 @@
+# 忽略 Python 產生的暫存文件
+__pycache__/
+*.py[cod]
+
+# 虛擬環境
+venv/
+ENV/
+env/
+
+# 忽略 .bat 文件
+*.bat
+
+# 忽略特定文件夾
+ignore/
+Outlook-Icon/
+Backup/
+
+# 忽略 VSCode 或其他 IDE 設定 (可選)
+.vscode/
+.idea/
+
