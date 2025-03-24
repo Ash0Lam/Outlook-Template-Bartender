@@ -12,4 +12,4 @@ class AppContext:
             self.root.iconbitmap(os.path.abspath(icon_path))
         
         # 設定主視窗標題
-        self.root.title("Outlook Template Assistant")
+        self.root.title("Outlook Template Bartender")

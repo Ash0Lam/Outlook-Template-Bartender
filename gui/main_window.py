@@ -319,6 +319,30 @@ class MainWindow:
         self.delete_btn.pack(side=tk.LEFT, padx=5)
         self.delete_btn.language_key = "delete"
         
+        # 簽名檔選項框架
+        signature_frame = ttk.Frame(button_frame)
+        signature_frame.pack(side=tk.RIGHT, padx=5)
+
+        # 簽名檔標籤
+        signature_label = ttk.Label(signature_frame, text=self._("signature") + ":")
+        signature_label.pack(side=tk.LEFT, padx=2)
+
+        # 獲取 Outlook 簽名檔列表
+        signatures = self.email_generator.get_outlook_signatures()
+
+        # 簽名檔下拉選單
+        self.signature_var = StringVar(value="<Default>")
+        self.signature_combobox = ttk.Combobox(
+            signature_frame, 
+            textvariable=self.signature_var,
+            values=signatures,
+            width=15,
+            state="readonly"
+        )
+        self.signature_combobox.pack(side=tk.LEFT, padx=2)
+
+
+
         # 右侧生成邮件按钮
         self.generate_btn = ttk.Button(button_frame, text=self._("generate_email"), command=self._generate_email)
         self.generate_btn.pack(side=tk.RIGHT, padx=5)
@@ -1335,8 +1359,26 @@ class MainWindow:
             messagebox.showwarning(self._("warning"), self._("template_no_sender"))
             return
         
-        # 生成郵件，傳遞模板和寄件人信息
-        if self.email_generator.generate_email(template, variables, sender):
+        # 獲取簽名檔選項
+        signature_option = self.signature_var.get()
+        
+        # 如果選擇默認簽名檔，使用 Outlook 的內建機制
+        if signature_option == "<Default>":
+            # 不需要額外操作，Outlook 會自動添加默認簽名檔
+            use_signature = True
+        elif signature_option == "<None>":
+            # 設置不使用簽名檔
+            use_signature = False
+        else:
+            # 使用指定簽名檔 - 讓 EmailGenerator 處理
+            use_signature = False  # 關閉默認簽名檔
+            
+        # 設置模板的簽名檔選項
+        template["use_signature"] = use_signature
+        template["signature_name"] = None if signature_option in ["<Default>", "<None>"] else signature_option
+    
+        # 生成郵件
+        if self.email_generator.generate_email(template, variables, sender, signature_option):
             self.status_var.set(self._("email_generated").format(name=template_name))
         else:
             messagebox.showerror(self._("error"), self._("email_generation_failed"))

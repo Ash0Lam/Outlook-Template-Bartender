@@ -46,25 +46,90 @@ class EmailGenerator:
             return False
 
     def get_outlook_accounts(self) -> List[Dict[str, Any]]:
-        """獲取 Outlook 中配置的所有郵件賬戶"""
+        """獲取 Outlook 中配置的所有郵件賬戶，包括企業郵件"""
         accounts = []
         try:
             outlook = win32com.client.Dispatch("Outlook.Application")
             namespace = outlook.GetNamespace("MAPI")
-            for account in namespace.Accounts:
-                # 保存完整賬戶對象和郵件地址
+            
+            # 嘗試獲取默認帳戶
+            try:
+                default_account = namespace.Accounts.Item(1)
                 accounts.append({
-                    "name": account.DisplayName,
-                    "email": account.SmtpAddress,
-                    "account": account  # 保存完整賬戶對象以便後續使用
+                    "name": default_account.DisplayName,
+                    "email": default_account.SmtpAddress,
+                    "account": default_account
                 })
-                print(f"找到賬戶: {account.DisplayName} <{account.SmtpAddress}>")
+                print(f"找到默認帳戶: {default_account.DisplayName} <{default_account.SmtpAddress}>")
+            except Exception as e:
+                print(f"獲取默認帳戶時出錯: {e}")
+            
+            # 使用循環方式獲取所有帳戶
+            for i in range(1, namespace.Accounts.Count + 1):
+                try:
+                    account = namespace.Accounts.Item(i)
+                    
+                    # 避免重複添加
+                    if not any(acc["email"] == account.SmtpAddress for acc in accounts):
+                        accounts.append({
+                            "name": account.DisplayName,
+                            "email": account.SmtpAddress,
+                            "account": account
+                        })
+                        print(f"找到帳戶: {account.DisplayName} <{account.SmtpAddress}>")
+                except Exception as e:
+                    print(f"獲取帳戶 {i} 時出錯: {e}")
+            
+            # 如果無法獲取任何帳戶，嘗試以不同方式獲取
+            if not accounts:
+                try:
+                    # 嘗試直接從當前使用者個人資料獲取
+                    profile = namespace.CurrentUser
+                    if profile:
+                        accounts.append({
+                            "name": profile.Name,
+                            "email": profile.Address,
+                            "account": None  # 這裡無法獲取完整帳戶對象
+                        })
+                        print(f"從個人資料獲取: {profile.Name} <{profile.Address}>")
+                except Exception as e:
+                    print(f"獲取當前使用者資料時出錯: {e}")
+            
+            # 嘗試獲取委派和共享郵箱
+            try:
+                # 遍歷所有資料夾，嘗試找到共享郵箱
+                folders = namespace.Folders
+                for i in range(1, folders.Count + 1):
+                    try:
+                        folder = folders.Item(i)
+                        email = folder.Name  # 對於共享郵箱，通常名稱就是郵件地址
+                        if "@" in email and not any(acc["email"] == email for acc in accounts):
+                            accounts.append({
+                                "name": folder.Name,
+                                "email": email,
+                                "account": None  # 無法獲取完整帳戶對象
+                            })
+                            print(f"找到共享郵箱: {email}")
+                    except Exception as e:
+                        print(f"處理資料夾 {i} 時出錯: {e}")
+            except Exception as e:
+                print(f"獲取共享郵箱時出錯: {e}")
+                
         except Exception as e:
             print(f"獲取 Outlook 賬戶時出錯: {e}")
+        
         return accounts
 
-    def generate_email(self, template: Dict[str, Any], variables: Dict[str, str], sender: Optional[str] = None) -> bool:
-        """生成並打開 Outlook 郵件"""
+    def generate_email(self, template: Dict[str, Any], variables: Dict[str, str], sender: Optional[str] = None, signature_option: str = "<Default>") -> bool:
+        """
+        生成並打開 Outlook 郵件
+        
+        Args:
+            template: 模板數據
+            variables: 變數值
+            sender: 寄件人郵件地址
+            signature_option: 簽名檔選項 ("<Default>", "<None>", 或特定簽名檔名稱)
+        """
         try:
             # 確保 Outlook 已啟動
             if not self.start_outlook_if_needed():
@@ -75,77 +140,138 @@ class EmailGenerator:
             namespace = outlook.GetNamespace("MAPI")
             mail = outlook.CreateItem(0)
 
-            # 設置寄件人（如果指定）
-            if sender:
-                print(f"嘗試設置寄件人: {sender}")
-                # 獲取所有賬戶
-                accounts = self.get_outlook_accounts()
-                sender_set = False
-                
-                for account in accounts:
-                    print(f"比較賬戶: {account['email']} 與 {sender}")
-                    if account['email'].lower() == sender.lower():
-                        try:
-                            # 使用更可靠的方法設置寄件人
-                            mail._oleobj_.Invoke(*(64209, 0, 8, 0, account['account']))
-                            print(f"成功設置寄件人為: {sender}")
-                            sender_set = True
-                            break
-                        except Exception as e:
-                            print(f"設置寄件人時出錯: {e}")
-                            error_msg = f"設置寄件人時出錯: {str(e)}"
-                            msgbox.showerror("寄件人設置錯誤", error_msg)
-                            return False
-                
-                if not sender_set:
-                    error_msg = f"找不到匹配的寄件人賬戶: {sender}"
-                    print(error_msg)
-                    msgbox.showerror("寄件人錯誤", error_msg)
-                    return False
-
-            # 設置收件人和抄送
-            mail.To = template.get("to", "")
-            mail.CC = template.get("cc", "")
-
-            # 主題變數替換
-            subject = template.get("subject", "")
+            # 變數替換
+            variables_dict = {}
             for var_name, var_value in variables.items():
-                subject = subject.replace(f"{{{var_name}}}", var_value)
-            mail.Subject = subject
-
-            # 正文變數替換
-            body = template.get("body", "")
-            for var_name, var_value in variables.items():
-                body = body.replace(f"{{{var_name}}}", var_value)
-
+                variables_dict[f"{{{var_name}}}"] = var_value
+            
+            # 替換函數，處理缺失變數
+            def replace_vars(text):
+                if not text:
+                    return ""
+                for var, value in variables_dict.items():
+                    text = text.replace(var, value)
+                return text
+            
+            # 替換主題、正文、收件人和抄送中的變數
+            subject = replace_vars(template.get("subject", ""))
+            body = replace_vars(template.get("body", ""))
+            to = replace_vars(template.get("to", ""))
+            cc = replace_vars(template.get("cc", ""))
+            
             # @email 替換
             pattern = r'@{([^{}]+)}'
             body = re.sub(pattern, lambda m: f"@{m.group(1)}", body)
-
-            # 設置收件人和抄送 (需要做變數替換)
-            to = template.get("to", "")
-            cc = template.get("cc", "")
-            for var_name, var_value in variables.items():
-                to = to.replace(f"{{{var_name}}}", var_value)
-                cc = cc.replace(f"{{{var_name}}}", var_value)
+            
+            # 設置郵件屬性
             mail.To = to
             mail.CC = cc
-
-
-            # 設定正文
+            mail.Subject = subject
+            
+            # 處理簽名檔設置
+            use_signature = True
+            if signature_option == "<None>":
+                use_signature = False
+            elif signature_option != "<Default>" and isinstance(signature_option, str):
+                # 嘗試使用指定的簽名檔
+                try:
+                    import os
+                    appdata = os.environ.get('APPDATA', '')
+                    signature_path = os.path.join(appdata, 'Microsoft', 'Signatures', signature_option)
+                    
+                    # 優先嘗試 HTML 格式
+                    html_path = f"{signature_path}.htm"
+                    if os.path.exists(html_path):
+                        with open(html_path, 'r', encoding='utf-8') as f:
+                            signature_html = f.read()
+                        # 找到簽名檔的 <body> 部分
+                        body_match = re.search(r'<body[^>]*>(.*?)</body>', signature_html, re.DOTALL)
+                        if body_match:
+                            signature_content = body_match.group(1)
+                            # 在郵件 HTML 結尾前添加簽名檔
+                            if "<html>" in body.lower():
+                                body = body.replace('</body>', signature_content + '</body>')
+                            else:
+                                body = f"<html><body>{body}{signature_content}</body></html>"
+                    
+                    # 設置 use_signature = False 避免自動添加默認簽名檔
+                    use_signature = False
+                except Exception as e:
+                    print(f"使用指定簽名檔時出錯: {e}")
+            
+            # 設置郵件正文
             if "<html>" in body.lower():
                 mail.HTMLBody = body
+                if not use_signature:
+                    try:
+                        mail._oleobj_.Invoke(*(2381, 0, 8, 0, False))  # Don't use signature
+                    except:
+                        print("禁用簽名檔失敗")
             elif any(tag in body.lower() for tag in ["<p>", "<div>", "<span>", "<table>", "<br"]):
                 mail.HTMLBody = f"<html><body>{body}</body></html>"
+                if not use_signature:
+                    try:
+                        mail._oleobj_.Invoke(*(2381, 0, 8, 0, False))  # Don't use signature
+                    except:
+                        print("禁用簽名檔失敗")
             else:
                 mail.Body = body
+                if not use_signature:
+                    try:
+                        mail._oleobj_.Invoke(*(2381, 0, 8, 0, False))  # Don't use signature
+                    except:
+                        print("禁用簽名檔失敗")
 
             # 檢查是否有圖片附件需要添加
             if "cid:" in body:
                 self._add_image_attachments(mail, template.get("name", ""))
 
+            # 設置寄件人（如果指定）
+            sender_success = False
+            if sender:
+                print(f"嘗試設置寄件人: {sender}")
+                
+                # 1. 直接嘗試設置 SendOnBehalfOfName (最常用於團隊郵箱)
+                try:
+                    mail.SentOnBehalfOfName = sender
+                    sender_success = True
+                    print(f"成功設置「代表」發送: {sender}")
+                except Exception as e:
+                    print(f"設置「代表」發送失敗: {e}")
+                
+                # 2. 如果上述方法失敗，嘗試找到對應帳戶
+                if not sender_success:
+                    accounts = self.get_outlook_accounts()
+                    for account in accounts:
+                        if account['email'].lower() == sender.lower() and account['account'] is not None:
+                            try:
+                                mail._oleobj_.Invoke(*(64209, 0, 8, 0, account['account']))
+                                sender_success = True
+                                print(f"成功設置寄件人帳戶: {sender}")
+                                break
+                            except Exception as e:
+                                print(f"設置寄件人帳戶失敗: {e}")
+                
+                # 3. 使用其他方法嘗試
+                if not sender_success:
+                    try:
+                        mail.SendUsingAccount = sender
+                        sender_success = True
+                        print(f"成功使用SendUsingAccount: {sender}")
+                    except Exception as e:
+                        print(f"SendUsingAccount設置失敗: {e}")
+
+            # 如果設置寄件人失敗，給用戶提示
+            if sender and not sender_success:
+                msgbox.showinfo(
+                    "寄件人設置信息", 
+                    f"無法自動設置寄件人為「{sender}」\n\n郵件將使用預設寄件人開啟，請在郵件窗口中手動選擇寄件人。"
+                )
+
             # 顯示郵件
             mail.Display(False)
+
+            # 即使設置寄件人失敗，我們也認為郵件生成成功
             return True
 
         except Exception as e:
@@ -161,6 +287,45 @@ class EmailGenerator:
             # 顯示錯誤彈窗
             msgbox.showerror("郵件生成錯誤", user_friendly_message)
             return False
+
+    def get_outlook_signatures(self) -> List[str]:
+        """獲取 Outlook 中可用的簽名檔列表"""
+        signatures = ["<Default>", "<None>"]  # 基本選項
+        
+        # 嘗試查找簽名檔路徑
+        try:
+            import os
+            import platform
+            
+            if platform.system() == 'Windows':
+                # Windows 上 Outlook 簽名檔的默認位置
+                appdata = os.environ.get('APPDATA', '')
+                signature_path = os.path.join(appdata, 'Microsoft', 'Signatures')
+                
+                if os.path.exists(signature_path):
+                    # 獲取所有 HTML 和 RTF 簽名檔
+                    for file in os.listdir(signature_path):
+                        base, ext = os.path.splitext(file)
+                        if ext.lower() in ['.htm', '.html', '.rtf']:
+                            if base not in signatures:
+                                signatures.append(base)
+        except Exception as e:
+            print(f"獲取簽名檔時出錯: {e}")
+        
+        return signatures
+
+    def _find_and_set_account(self, mail, namespace, email_address):
+        """嘗試查找並設置對應的帳戶"""
+        # 遍歷所有資料夾，嘗試找到匹配的共享郵箱
+        for i in range(1, namespace.Folders.Count + 1):
+            folder = namespace.Folders.Item(i)
+            if folder.Name.lower() == email_address.lower():
+                mail.SendUsingAccount = folder.Name
+                return True
+        
+        # 如果無法找到匹配資料夾，嘗試設置 SentOnBehalfOfName
+        mail.SentOnBehalfOfName = email_address
+        return True
 
     def _add_image_attachments(self, mail, template_name):
         """添加圖片附件到郵件並設置內容ID

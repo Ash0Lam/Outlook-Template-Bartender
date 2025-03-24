@@ -163,6 +163,7 @@ class EditTemplateWindow:
     def _create_widgets(self):
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
+        row_index = 0
 
 
         # 設定 Grid 欄位寬度
@@ -192,14 +193,27 @@ class EditTemplateWindow:
         # Sender
         ttk.Label(main_frame, text=self._("sender") + ":", width=label_width, anchor='e').grid(row=3, column=0, sticky='e', padx=5, pady=5)
         account_emails = [acc["email"] for acc in self.accounts] if self.accounts else []
+
+        # 添加手動輸入選項
+        account_emails.append("-- 手動輸入 --")
+
         self.sender_combobox = ttk.Combobox(main_frame, textvariable=self.sender_var, width=entry_width)
         self.sender_combobox['values'] = account_emails
         self.sender_combobox.grid(row=3, column=1, sticky='we', padx=5, pady=5)
 
+        # 綁定選擇事件
+        self.sender_combobox.bind("<<ComboboxSelected>>", self._on_sender_selected)
+
         template_sender = self.template.get("sender", "").strip()
         if template_sender and template_sender in account_emails:
             self.sender_combobox.set(template_sender)
-        elif account_emails:
+        elif template_sender:  # 如果模板有寄件人但不在列表中
+            # 添加到下拉列表
+            values = list(self.sender_combobox['values'])
+            values.insert(0, template_sender)  # 插入到列表前端
+            self.sender_combobox['values'] = values
+            self.sender_combobox.set(template_sender)
+        elif account_emails and account_emails[0] != "-- 手動輸入 --":
             self.sender_combobox.set(account_emails[0])
 
         # Recipient
@@ -254,6 +268,67 @@ class EditTemplateWindow:
         self.edit_html_btn.pack(side=tk.LEFT, padx=5)
         self.save_btn = ttk.Button(button_frame, text=self._("save"), command=self._save_template)
         self.save_btn.pack(side=tk.RIGHT, padx=5)
+
+        # 簽名檔選項
+        signature_frame = ttk.LabelFrame(main_frame, text=self._("signature_options"))
+        signature_frame.pack(fill=tk.X, pady=5)
+
+        self.use_signature_var = tk.BooleanVar(value=True)  # 默認使用簽名檔
+        self.use_signature_checkbox = ttk.Checkbutton(
+            signature_frame, 
+            text=self._("use_default_signature"),
+            variable=self.use_signature_var
+        )
+        self.use_signature_checkbox.pack(anchor=tk.W, padx=5, pady=2)
+
+        # 設置初始值
+        if "use_signature" in self.template:
+            self.use_signature_var.set(self.template["use_signature"])
+
+        # 提示文本
+        signature_info = ttk.Label(
+            signature_frame,
+            text=self._("signature_info"),
+            font=("TkDefaultFont", 8, "italic"),
+            foreground="gray"
+        )
+        signature_info.pack(side=tk.LEFT, padx=5)
+
+    def _on_sender_selected(self, event=None):
+        """處理寄件人下拉框選擇事件"""
+        if self.sender_var.get() == "-- 手動輸入 --":
+            from tkinter import simpledialog
+            email = simpledialog.askstring(
+                "輸入電子郵件", 
+                "請輸入寄件人郵件地址:",
+                parent=self.window
+            )
+            if email and '@' in email:
+                # 如果輸入有效，更新下拉選單
+                values = list(self.sender_combobox['values'])
+                
+                # 移除現有的手動輸入選項
+                if "-- 手動輸入 --" in values:
+                    values.remove("-- 手動輸入 --")
+                    
+                # 添加新郵件地址和手動輸入選項
+                if email not in values:
+                    values.insert(0, email)  # 插入到列表前端
+                values.append("-- 手動輸入 --")  # 在末尾添加手動輸入選項
+                
+                self.sender_combobox['values'] = values
+                self.sender_combobox.set(email)
+            else:
+                # 如果取消或輸入無效，恢復之前的選擇
+                values = list(self.sender_combobox['values'])
+                if self.accounts and self.accounts[0]["email"]:
+                    self.sender_combobox.set(self.accounts[0]["email"])
+                else:
+                    # 選擇第一個非手動輸入的選項
+                    for value in values:
+                        if value != "-- 手動輸入 --":
+                            self.sender_combobox.set(value)
+                            break
 
     def _open_webview_editor(self):
         # 獲取按鈕文本 - 多語言支持
@@ -514,7 +589,8 @@ class EditTemplateWindow:
             "body": body,
             "variables": variables,
             "note_en": self.note_entry.get().strip(),
-            "tag_en": self.tag_entry.get().strip()
+            "tag_en": self.tag_entry.get().strip(),
+            "use_signature": self.use_signature_var.get() if hasattr(self, 'use_signature_var') else True
         }
 
         # 如果是编辑模板，并且修改了模板名称，则检查是否存在同名模板
