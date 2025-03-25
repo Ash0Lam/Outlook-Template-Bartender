@@ -35,7 +35,6 @@ Perfect for:
   - Automatically preserves most of the **original HTML formatting**.
   - Modify, insert variables, save instantly.
 - 🔄 **Dynamic Variables**: Insert `{receiver}`, `{date}`, `{project_name}` placeholders and auto-fill them during email generation.
-- 👤 **Smart @Mentions**: Use `@{Email}` syntax to automatically convert email addresses to proper @mentions.
 - 📧 **Direct Outlook Integration**: Generate and open pre-filled emails in Outlook.
 - 👤 **Multiple Account Support**: Choose your sender account easily.
 - 📝 **Signature Management**: Choose between default, custom, or no signature for each email.
@@ -113,7 +112,6 @@ Perfect for:
 
 ### Advanced Features
 
-- **Smart @Mentions**: Use `@{Email}` in your template body to have the email address automatically converted to a proper @mention with the recipient's name.
 - **HTML Formatting Preservation**: Copy complex HTML formatted emails (tables, colors, etc.) and paste them directly into the editor - all formatting is preserved exactly.
 - **Multiple Sender Support**: Easily switch between different sender accounts for different templates.
 
