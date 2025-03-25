@@ -340,7 +340,6 @@ class EditTemplateWindow:
             if not body_content:
                 body_content = ""
 
-
             editor_html = f"""
             <!DOCTYPE html>
             <html>
@@ -363,8 +362,22 @@ class EditTemplateWindow:
                     </div>
                 </div>
             <script>
-                // 初始化 CKEditor
-                CKEDITOR.replace('editor');
+                // 初始化 CKEditor，配置為保留所有原始格式和樣式
+                CKEDITOR.replace('editor', {{
+                    allowedContent: true,  // 允許所有內容和樣式
+                    extraAllowedContent: 'table[*](*);tr[*](*);td[*](*);th[*](*);span[*](*);p[*](*);div[*](*);',  // 特別允許表格和常用元素的所有屬性和樣式
+                    font_defaultLabel: 'Arial',  // 設置默認字體為 Arial
+                    fontSize_defaultLabel: '12px',  // 設置默認字體大小
+                    contentsCss: [
+                        // 添加自定義樣式，確保表格顯示正確
+                        'body {{ font-family: Arial, sans-serif; }}',
+                        'table {{ border-collapse: collapse; width: auto; }}',
+                        'table td, table th {{ border: 1px solid #000; padding: 4px 8px; }}'
+                    ],
+                    // 保留完整的 HTML 源碼
+                    htmlEncodeOutput: false,
+                    entities: false
+                }});
 
                 // 確認是否有未保存的變更
                 let isContentSaved = false;

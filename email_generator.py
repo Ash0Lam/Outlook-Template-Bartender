@@ -121,15 +121,6 @@ class EmailGenerator:
         return accounts
 
     def generate_email(self, template: Dict[str, Any], variables: Dict[str, str], sender: Optional[str] = None, signature_option: str = "<Default>") -> bool:
-        """
-        生成並打開 Outlook 郵件
-        
-        Args:
-            template: 模板數據
-            variables: 變數值
-            sender: 寄件人郵件地址
-            signature_option: 簽名檔選項 ("<Default>", "<None>", 或特定簽名檔名稱)
-        """
         try:
             # 確保 Outlook 已啟動
             if not self.start_outlook_if_needed():
@@ -140,12 +131,35 @@ class EmailGenerator:
             namespace = outlook.GetNamespace("MAPI")
             mail = outlook.CreateItem(0)
 
-            # 變數替換
+            # 獲取原始內容
+            body = template.get("body", "")
+            subject = template.get("subject", "")
+            to = template.get("to", "")
+            cc = template.get("cc", "")
+            
+            # 先處理 @{變數Email} 格式，在一般變數替換之前
+            pattern = r'@\{([^{}]+)\}'
+            
+            def email_to_name(match):
+                email_var = match.group(1)
+                if email_var in variables:
+                    email = variables[email_var]
+                    # 從電子郵件中提取名字（取@符號前的部分）
+                    name = email.split('@')[0] if '@' in email else email
+                    # 將名字格式化，例如將"john.doe"轉為"John Doe"
+                    name = name.replace('.', ' ').title()
+                    return f"@{name}"
+                return match.group(0)  # 如果變數不存在，保持原樣
+            
+            # 先應用 @{變數} 處理
+            body = re.sub(pattern, email_to_name, body)
+            
+            # 再建立變數字典用於一般替換
             variables_dict = {}
             for var_name, var_value in variables.items():
                 variables_dict[f"{{{var_name}}}"] = var_value
             
-            # 替換函數，處理缺失變數
+            # 定義替換函數
             def replace_vars(text):
                 if not text:
                     return ""
@@ -153,15 +167,11 @@ class EmailGenerator:
                     text = text.replace(var, value)
                 return text
             
-            # 替換主題、正文、收件人和抄送中的變數
-            subject = replace_vars(template.get("subject", ""))
-            body = replace_vars(template.get("body", ""))
-            to = replace_vars(template.get("to", ""))
-            cc = replace_vars(template.get("cc", ""))
-            
-            # @email 替換
-            pattern = r'@{([^{}]+)}'
-            body = re.sub(pattern, lambda m: f"@{m.group(1)}", body)
+            # 應用一般變數替換
+            body = replace_vars(body)
+            subject = replace_vars(subject)
+            to = replace_vars(to)
+            cc = replace_vars(cc)
             
             # 設置郵件屬性
             mail.To = to

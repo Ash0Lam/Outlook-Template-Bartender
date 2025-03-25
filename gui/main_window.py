@@ -54,58 +54,52 @@ class MainWindow:
         self.root = root
         self.language_manager = language_manager
         self._ = language_manager.get_text if language_manager else lambda x: x
-        self.outlook_checker = EmailGenerator()  # 确保初始化为正确的对象
+        self.outlook_checker = EmailGenerator()
         self.accounts = self.outlook_checker.get_outlook_accounts() if self.outlook_checker else []
         self.variable_values = {}
-
-        # 初始化 search_timer 和其他設置
-        self.search_timer = None
-
         
-        # 定義緩存變數用於存儲處理後的HTML內容
+        # 初始化其他設置
+        self.search_timer = None
         self.cached_template_content = {}
-
-        # 确保 db_worker 线程只启动一次
+        
+        # 確保 db_worker 線程只啟動一次
         if not hasattr(self, 'db_worker') or not self.db_worker.is_alive():
             self.db_worker = DBWorker(db_queue)
-
-        self.root.title("Outlook Template Bartender")
-        self.root.geometry("775x975")
-        self.root.resizable(True, True)
-
-        # 設置窗口初始大小
-        window_width = 775
-        window_height = 975
-        self.root.geometry(f"{window_width}x{window_height}")
-        self.root.resizable(True, True)
         
-        # 完成所有初始化後，在顯示窗口之前設置位置
-        self.root.withdraw()  # 先隱藏窗口，避免閃爍
-
+        self.root.title("Outlook Template Bartender")
+        
+        # 使用Grid布局管理器進行整體布局
+        self.root.grid_rowconfigure(0, weight=1)  # 主內容區域可以擴展
+        self.root.grid_rowconfigure(1, weight=0)  # 按鈕區域固定高度
+        self.root.grid_columnconfigure(0, weight=1)  # 允許水平擴展
+        
+        # 設置適當的最小視窗尺寸
+        self.root.minsize(width=775, height=775)
+        
         # 初始化模板管理器和电子邮件生成器
         self.template_manager = template_manager if template_manager else TemplateManager()
         self.email_generator = EmailGenerator()
-
+        
         # 事件类型和模板选择变量
         self.selected_event_type = StringVar()
         self.selected_template = StringVar()
-
+        
         # 变量输入框引用
         self.var_entries = {}
-
+        
         # 搜索变量
         self.search_var = StringVar()
-
-        # 创建界面
+        
+        # 创建界面元素
         self._create_widgets()
-
+        
         # 初始化事件类型下拉菜单
         self._update_event_types()
         
-         # 在所有元素創建完成後居中窗口
-        self.root.update_idletasks()  # 確保所有元素都已完全繪製
+        # 在所有元素創建完成後居中窗口
+        self.root.update_idletasks()
         self._center_window()
-        self.root.deiconify()  # 顯示窗口
+        self.root.deiconify()
 
     def _center_window(self):
         """將窗口置於螢幕中央"""
@@ -137,9 +131,15 @@ class MainWindow:
     
     def _create_widgets(self):
         """創建窗口小部件"""
+        # 使用Grid布局替換Pack布局，讓底部按鈕固定
+        self.root.grid_rowconfigure(0, weight=1)  # 主內容區域可以擴展
+        self.root.grid_rowconfigure(1, weight=0)  # 按鈕區域固定高度
+        self.root.grid_rowconfigure(2, weight=0)  # 狀態欄固定高度
+        self.root.grid_columnconfigure(0, weight=1)  # 允許水平擴展
+        
         # 創建主框架
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.grid(row=0, column=0, sticky="nsew")
         version = self.template_manager.db_manager.get_app_info("version", self.language_manager.current_language)
         
         # 頂部菜單欄
@@ -164,8 +164,6 @@ class MainWindow:
         version_label = ttk.Label(version_frame, text=f"Version: {version}", font=("Arial", 8))
         version_label.pack(pady=5)
         
-
-
         # 添加分隔線
         separator = ttk.Separator(main_frame, orient='horizontal')
         separator.pack(fill=tk.X, pady=10)
@@ -240,7 +238,6 @@ class MainWindow:
         # HTML预览选项
         preview_option_frame = ttk.Frame(right_frame)
         preview_option_frame.pack(fill=tk.X, pady=5)
-
         
         # 预览框架
         self.preview_frame = ttk.LabelFrame(right_frame, text=self._("template_preview"))
@@ -258,7 +255,6 @@ class MainWindow:
         # 綁定右鍵菜單到模板列表和事件類型下拉菜單
         self.template_listbox.bind("<Button-3>", self._show_template_context_menu)
         self.event_type_combobox.bind("<Button-3>", self._show_event_context_menu)
-
 
         # 变量框架中添加滚动条
         var_canvas = tk.Canvas(self.variables_frame)
@@ -295,9 +291,9 @@ class MainWindow:
         
         self.var_scrollable_frame = var_scrollable_frame
         
-        # 按钮框架 - 底部
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, padx=10, pady=10, side=tk.BOTTOM)
+        # 按钮框架 - 底部 (現在使用Grid布局固定在窗口底部)
+        button_frame = ttk.Frame(self.root)
+        button_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
         
         # 左侧按钮组
         left_buttons = ttk.Frame(button_frame)
@@ -341,17 +337,15 @@ class MainWindow:
         )
         self.signature_combobox.pack(side=tk.LEFT, padx=2)
 
-
-
         # 右侧生成邮件按钮
         self.generate_btn = ttk.Button(button_frame, text=self._("generate_email"), command=self._generate_email)
         self.generate_btn.pack(side=tk.RIGHT, padx=5)
         self.generate_btn.language_key = "generate_email"
         
-        # 状态栏
+        # 状态栏 (同樣使用Grid布局固定在窗口底部)
         self.status_var = StringVar()
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        status_bar.grid(row=2, column=0, sticky="ew")
         
         # 检查 Outlook 是否可用
         if not self.email_generator.is_outlook_available():
@@ -364,8 +358,6 @@ class MainWindow:
         self.event_type_combobox.bind("<<ComboboxSelected>>", self._on_event_type_selected)
         self.template_listbox.bind("<<ListboxSelect>>", self._on_template_selected)
         self.template_listbox.bind("<Double-1>", lambda e: self._edit_selected_template())
-
-        self._create_context_menus()
     
     def _create_menu(self):
         """創建菜單欄"""
@@ -629,45 +621,75 @@ class MainWindow:
         
         # 檢查緩存中是否已有處理過的內容
         if template_id in self.cached_template_content:
-            body_text = self.cached_template_content[template_id]
-            self._update_preview_content(preview_body, body_text)
+            try:
+                if preview_body.winfo_exists():  # 檢查widget是否存在
+                    body_text = self.cached_template_content[template_id]
+                    self._update_preview_content(preview_body, body_text)
+            except Exception as e:
+                print(f"更新預覽內容時出錯: {e}")
         else:
-            # 先清空預覽並顯示處理中的訊息
-            preview_body.config(state=tk.NORMAL)
-            preview_body.delete(1.0, tk.END)
-            preview_body.insert(tk.END, "正在處理HTML內容...\n\n")
-            
-            if has_images:
-                preview_body.insert(tk.END, "[此模板包含圖片，為提高性能僅顯示文字內容]\n\n")
-            
-            preview_body.config(state=tk.DISABLED)
-            
-            # 開啟處理線程
-            def process_html():
-                # 提取純文本用於預覽
-                processed_text = self._remove_html_tags(html_content)
-                self.cached_template_content[template_id] = processed_text
+            try:
+                # 先檢查preview_body是否存在
+                if not preview_body.winfo_exists():
+                    print("預覽窗口已不存在")
+                    return
+                    
+                # 先清空預覽並顯示處理中的訊息
+                preview_body.config(state=tk.NORMAL)
+                preview_body.delete(1.0, tk.END)
+                preview_body.insert(tk.END, "正在處理HTML內容...\n\n")
                 
-                # 使用 after 方法在主線程中更新 UI
-                try:
-                    self.root.after(10, lambda: self._update_preview_content(preview_body, processed_text))
-                except Exception:
-                    # 如果self.root不可用，嘗試使用self.window（在不同窗口中）
+                if has_images:
+                    preview_body.insert(tk.END, "[此模板包含圖片，為提高性能僅顯示文字內容]\n\n")
+                
+                preview_body.config(state=tk.DISABLED)
+                
+                # 開啟處理線程
+                def process_html():
+                    # 提取純文本用於預覽
+                    processed_text = self._remove_html_tags(html_content)
+                    self.cached_template_content[template_id] = processed_text
+                    
+                    # 使用 after 方法在主線程中更新 UI，但需確保元素仍存在
+                    def safe_update():
+                        try:
+                            if preview_body.winfo_exists():  # 確認widget仍存在
+                                self._update_preview_content(preview_body, processed_text)
+                        except Exception as e:
+                            print(f"執行UI更新時出錯: {e}")
+                    
+                    # 嘗試在主窗口或子窗口上調度更新
                     try:
-                        self.window.after(10, lambda: self._update_preview_content(preview_body, processed_text))
+                        if hasattr(self, 'root') and self.root.winfo_exists():
+                            self.root.after(10, safe_update)
+                        elif hasattr(self, 'window') and self.window.winfo_exists():
+                            self.window.after(10, safe_update)
+                        else:
+                            print("找不到有效的窗口進行UI更新")
                     except Exception as e:
-                        print(f"更新預覽內容時出錯: {e}")
-            
-            threading.Thread(target=process_html).start()
-    
+                        print(f"調度UI更新時出錯: {e}")
+                
+                # 啟動處理線程
+                threading.Thread(target=process_html).start()
+            except Exception as e:
+                print(f"初始化HTML預覽時出錯: {e}")
+
     def _update_preview_content(self, text_widget, content):
         """更新預覽文本內容"""
-        text_widget.config(state=tk.NORMAL)
-        text_widget.delete(1.0, tk.END)
-        
-        # 處理變量標記，使其為紅色粗體
-        self._insert_text_with_variable_highlight(text_widget, content)
-        text_widget.config(state=tk.DISABLED)  # 只讀
+        try:
+            # 在操作前檢查widget是否仍存在
+            if not text_widget.winfo_exists():
+                print("文本窗口已不存在，無法更新內容")
+                return
+                
+            text_widget.config(state=tk.NORMAL)
+            text_widget.delete(1.0, tk.END)
+            
+            # 處理變量標記，使其為紅色粗體
+            self._insert_text_with_variable_highlight(text_widget, content)
+            text_widget.config(state=tk.DISABLED)  # 只讀
+        except Exception as e:
+            print(f"更新預覽內容時出錯: {e}")
     
     def _remove_html_tags(self, html):
         """移除 HTML 标签並將 HTML 內容轉換為文本，保留換行符，替換base64圖片為[圖片]標籤"""
