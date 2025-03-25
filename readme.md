@@ -35,14 +35,16 @@ Perfect for:
   - Automatically preserves most of the **original HTML formatting**.
   - Modify, insert variables, save instantly.
 - 🔄 **Dynamic Variables**: Insert `{receiver}`, `{date}`, `{project_name}` placeholders and auto-fill them during email generation.
+- 👤 **Smart @Mentions**: Use `@{Email}` syntax to automatically convert email addresses to proper @mentions.
 - 📧 **Direct Outlook Integration**: Generate and open pre-filled emails in Outlook.
 - 👤 **Multiple Account Support**: Choose your sender account easily.
+- 📝 **Signature Management**: Choose between default, custom, or no signature for each email.
 - 🌐 **Multilingual Interface**: English & Traditional Chinese.
 - 🔍 **Search & Filter**: Quickly find templates by name or content.
 - 🗂️ **Template Organization**: Event types + tags for better classification.
 - 📁 **Local Storage, No Cloud**: Secure SQLite database; no privacy concerns.
-- 💻 **Lightweight & Offline**: Works fully offline, no login required.
-
+- 💻 **Resource-Friendly**: Core application uses only ~25MB of RAM, with HTML editor loading only when needed.
+- 🔌 **Fully Offline**: Works completely offline, no login required.
 ---
 
 ## 📸 Screenshots
@@ -105,8 +107,15 @@ Perfect for:
 
 1. Select event type + template.
 2. Fill in variable values.
-3. Click **Generate Email**.
-4. Outlook opens the email ready-to-send, with images & formatting intact.
+3. Choose signature option (default/custom/none).
+4. Click **Generate Email**.
+5. Outlook opens the email ready-to-send, with images & formatting intact.
+
+### Advanced Features
+
+- **Smart @Mentions**: Use `@{Email}` in your template body to have the email address automatically converted to a proper @mention with the recipient's name.
+- **HTML Formatting Preservation**: Copy complex HTML formatted emails (tables, colors, etc.) and paste them directly into the editor - all formatting is preserved exactly.
+- **Multiple Sender Support**: Easily switch between different sender accounts for different templates.
 
 ---
 
@@ -174,9 +183,12 @@ MIT License.
 
 ## 🙌 Credits
 
-- Developed by [Ash](https://github.com/Ash0Lam)
-- CKEditor for rich-text editing.
-- Python win32com for Outlook integration.
+- Idea & Testing: [Ash](https://github.com/Ash0Lam)
+- Code Generation: Claude & GPT-4 AI assistants
+- CKEditor for rich-text editing
+- Python win32com for Outlook integration
+
+This project showcases a creative human-AI collaboration, where the human provides the idea, requirements, and testing, while AI assistants help generate and refine the code.
 
 ---
 
