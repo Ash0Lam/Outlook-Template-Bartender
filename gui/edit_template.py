@@ -269,30 +269,10 @@ class EditTemplateWindow:
         self.save_btn = ttk.Button(button_frame, text=self._("save"), command=self._save_template)
         self.save_btn.pack(side=tk.RIGHT, padx=5)
 
-        # 簽名檔選項
-        signature_frame = ttk.LabelFrame(main_frame, text=self._("signature_options"))
-        signature_frame.pack(fill=tk.X, pady=5)
-
-        self.use_signature_var = tk.BooleanVar(value=True)  # 默認使用簽名檔
-        self.use_signature_checkbox = ttk.Checkbutton(
-            signature_frame, 
-            text=self._("use_default_signature"),
-            variable=self.use_signature_var
-        )
-        self.use_signature_checkbox.pack(anchor=tk.W, padx=5, pady=2)
-
         # 設置初始值
         if "use_signature" in self.template:
             self.use_signature_var.set(self.template["use_signature"])
 
-        # 提示文本
-        signature_info = ttk.Label(
-            signature_frame,
-            text=self._("signature_info"),
-            font=("TkDefaultFont", 8, "italic"),
-            foreground="gray"
-        )
-        signature_info.pack(side=tk.LEFT, padx=5)
 
     def _on_sender_selected(self, event=None):
         """處理寄件人下拉框選擇事件"""
@@ -346,7 +326,7 @@ class EditTemplateWindow:
             <head>
                 <meta charset="UTF-8">
                 <title>HTML Editor</title>
-                <script src="https://cdn.ckeditor.com/4.16.0/standard/ckeditor.js"></script>
+                <script src="https://ash0lam.github.io/ash0lamRepo/ckeditor/ckeditor.js"></script>
                 <style>
                     html, body {{ height: 100%; margin: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column; }}
                     #editor-container {{ flex: 1; display: flex; flex-direction: column; }}
