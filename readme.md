@@ -54,6 +54,8 @@ Perfect for:
 
 ## 🚀 Installation
 
+This project currently runs as a Python script. To use it:
+
 ### Option 1: From Source (Recommended)
 
 1. **Clone the repository:**
