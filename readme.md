@@ -24,7 +24,6 @@ Perfect for:
 - Those who just need an efficient, simple template system without the bells & whistles
 - Anyone fed up with Outlook’s sluggishness when doing repetitive replies
 
-
 ---
 
 ## ✨ Features
@@ -44,11 +43,20 @@ Perfect for:
 - 📁 **Local Storage, No Cloud**: Secure SQLite database; no privacy concerns.
 - 💻 **Resource-Friendly**: Core application uses only ~25MB of RAM, with HTML editor loading only when needed.
 - 🔌 **Fully Offline**: Works completely offline, no login required.
+
 ---
 
 ## 📸 Screenshots
 
-*Coming Soon...*
+_Coming Soon..._
+
+---
+
+## 🚫 Platform Compatibility
+
+> ⚠️ **Windows Only – macOS & Linux Not Supported**  
+> This app uses `win32com.client` (COM interface to Microsoft Outlook), which is **only available on Windows**.  
+> The app **will not run** on macOS or Linux.
 
 ---
 
@@ -59,28 +67,26 @@ This project currently runs as a Python script. To use it:
 ### Option 1: From Source (Recommended)
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/Ash0Lam/OutlookTemplateBartender.git
    cd OutlookTemplateBartender
    ```
 
 2. **(Recommended) Create Virtual Environment:**
+
    ```bash
    python -m venv venv
    ```
 
 3. **Activate Virtual Environment:**
 
-   - **On Windows:**
-     ```bash
-     venv\Scripts\activate
-     ```
-   - **On macOS/Linux:**
-     ```bash
-     source venv/bin/activate
-     ```
+   ```bash
+   venv\Scripts\activate
+   ```
 
 4. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -90,7 +96,7 @@ This project currently runs as a Python script. To use it:
    python main_db.py
    ```
 
-### Option 2: Standalone Executable *(Coming Soon)*
+### Option 2: Standalone Executable _(Coming Soon)_
 
 ---
 
@@ -196,4 +202,3 @@ This project showcases a creative human-AI collaboration, where the human provid
 
 - GitHub: [https://github.com/Ash0Lam](https://github.com/Ash0Lam)
 - Website: [ash0lam.github.io](https://ash0lam.github.io)
-
