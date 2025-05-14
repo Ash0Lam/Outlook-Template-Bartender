@@ -154,29 +154,79 @@ class EmailGenerator:
             # 先應用 @{變數} 處理
             body = re.sub(pattern, email_to_name, body)
             
-            # 再建立變數字典用於一般替換
+            # 準備變數字典
             variables_dict = {}
             for var_name, var_value in variables.items():
-                variables_dict[f"{{{var_name}}}"] = var_value
+                variables_dict[var_name] = var_value
             
-            # 定義替換函數
-            def replace_vars(text):
+            # 定義完整替換函數 - 確保所有變數都被替換
+            def replace_all_vars(text):
                 if not text:
                     return ""
-                for var, value in variables_dict.items():
-                    text = text.replace(var, value)
-                return text
+                
+                # 使用正則表達式替換所有 {變數名} 格式的文本
+                def replace_var(match):
+                    var_full = match.group(0)  # 完整的 {變數名}
+                    var_name = match.group(1)  # 提取變數名
+                    
+                    # 檢查是否為圖片變數
+                    if var_name.startswith('inserted_photo') or var_name.startswith('inserted photo'):
+                        # 如果是圖片變數但在主題或普通文本中，直接返回空字符串或描述性文本
+                        return "[圖片]"
+                        
+                    # 非圖片變數，嘗試從變數字典中獲取值
+                    if var_name in variables_dict:
+                        return variables_dict[var_name]
+                    return var_full  # 如果找不到對應的值，保持原樣
+                    
+                # 使用正則替換
+                pattern = r'\{([^{}]+)\}'
+                return re.sub(pattern, replace_var, text)
             
-            # 應用一般變數替換
-            body = replace_vars(body)
-            subject = replace_vars(subject)
-            to = replace_vars(to)
-            cc = replace_vars(cc)
+            # 對主題和收件人信息進行完整變數替換
+            subject = replace_all_vars(subject)
+            to = replace_all_vars(to)
+            cc = replace_all_vars(cc)
             
-            # 設置郵件屬性
+            # 處理內文中的變數替換 - 圖片變數在主窗口中已經處理
+            # 但一般文本變數需要在這裡處理
+            if "<html>" in body.lower():
+                # HTML 內容需要特殊處理，保留圖片變數的處理結果
+                pattern = r'\{([^{}]+)\}'
+                
+                def replace_body_var(match):
+                    var_name = match.group(1)
+                    
+                    # 檢查是否為圖片變數 - 保留原樣，因為可能已經被處理
+                    if var_name.startswith('inserted_photo') or var_name.startswith('inserted photo'):
+                        return match.group(0)
+                    
+                    # 非圖片變數
+                    if var_name in variables_dict:
+                        return variables_dict[var_name]
+                    return match.group(0)
+                
+                # 替換內文中的變數
+                body = re.sub(pattern, replace_body_var, body)
+            else:
+                # 純文本內容，直接替換所有變數
+                body = replace_all_vars(body)
+            
+            # 設置郵件屬性 - 確保主題被完全設置
             mail.To = to
             mail.CC = cc
-            mail.Subject = subject
+            
+            # 特別處理主題行 - 確保完整顯示
+            try:
+                # 先嘗試直接設置主題
+                mail.Subject = subject
+                
+                # 額外嘗試使用Property訪問器設置主題，以確保完整顯示
+                mail._oleobj_.SetProperty(0x0037, subject)  # 0x0037是Subject屬性的MAPI標識符
+            except Exception as e:
+                print(f"設置主題時遇到錯誤: {e}")
+                # 如果高級方法失敗，回退到基本方法
+                mail.Subject = subject
             
             # 處理簽名檔設置
             use_signature = True
@@ -217,7 +267,7 @@ class EmailGenerator:
                         mail._oleobj_.Invoke(*(2381, 0, 8, 0, False))  # Don't use signature
                     except:
                         print("禁用簽名檔失敗")
-            elif any(tag in body.lower() for tag in ["<p>", "<div>", "<span>", "<table>", "<br"]):
+            elif any(tag in body.lower() for tag in ["<p>", "<div>", "<span>", "<table>", "<br", "<img"]):
                 mail.HTMLBody = f"<html><body>{body}</body></html>"
                 if not use_signature:
                     try:
@@ -249,7 +299,7 @@ class EmailGenerator:
                 except Exception as e:
                     print(f"設置「代表」發送失敗: {e}")
                 
-                # 2. 如果上述方法失敗，嘗試找到對應帳戶
+                # 2. 如果上述方法失敗，嘗試找到對應賬戶
                 if not sender_success:
                     accounts = self.get_outlook_accounts()
                     for account in accounts:
@@ -257,10 +307,10 @@ class EmailGenerator:
                             try:
                                 mail._oleobj_.Invoke(*(64209, 0, 8, 0, account['account']))
                                 sender_success = True
-                                print(f"成功設置寄件人帳戶: {sender}")
+                                print(f"成功設置寄件人賬戶: {sender}")
                                 break
                             except Exception as e:
-                                print(f"設置寄件人帳戶失敗: {e}")
+                                print(f"設置寄件人賬戶失敗: {e}")
                 
                 # 3. 使用其他方法嘗試
                 if not sender_success:
@@ -271,6 +321,14 @@ class EmailGenerator:
                     except Exception as e:
                         print(f"SendUsingAccount設置失敗: {e}")
 
+            # 額外驗證主題是否正確設置
+            if mail.Subject != subject:
+                try:
+                    print(f"檢測到主題不匹配，重新設置主題: {subject}")
+                    mail.Subject = subject
+                except:
+                    pass
+
             # 如果設置寄件人失敗，給用戶提示
             if sender and not sender_success:
                 msgbox.showinfo(
@@ -278,8 +336,23 @@ class EmailGenerator:
                     f"無法自動設置寄件人為「{sender}」\n\n郵件將使用預設寄件人開啟，請在郵件窗口中手動選擇寄件人。"
                 )
 
+            # 創建並顯示郵件前，再次驗證主題設置
+            try:
+                # 設置一些額外的屬性，以確保主題完整顯示
+                mail._oleobj_.SetProperty(0x0037, subject)  # 0x0037是Subject屬性的MAPI標識符
+                mail._oleobj_.SetProperty(0x0070, subject)  # 0x0070是ConversationTopic屬性的MAPI標識符
+            except:
+                pass
+
             # 顯示郵件
             mail.Display(False)
+            
+            # 生成後立即檢查主題並提示用戶
+            if len(subject) > 60:  # 主題較長時提示用戶
+                msgbox.showinfo(
+                    "主題完整性提示", 
+                    f"您的郵件主題較長，在Outlook中可能不會完整顯示。\n\n完整主題是:\n{subject}\n\n如果您看到主題顯示不全，可以在郵件窗口中手動修改。"
+                )
 
             # 即使設置寄件人失敗，我們也認為郵件生成成功
             return True
